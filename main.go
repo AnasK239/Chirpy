@@ -1,19 +1,43 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
+	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/AnasK239/Chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 // http.FileServer(http.Dir(".")) is a handler that serves files from the exact URL resource path given
 // http.NewServeMux creates an Interception point for requests
 // calling .Handle on a serveMux requires giving the request path to be handled
 // and the handler that handles it
+type apiConfig struct {
+	fileServerHits atomic.Int32
+	dbQueries *database.Queries
+}
 
 func main() {
+	godotenv.Load()
 
-	var apiCfg apiConfig
+	dbURL := os.Getenv("DB_URL")
+
+	db , err := sql.Open("postgres" , dbURL)
+	if err != nil{
+		log.Fatalf("Error opening database conneciton")
+	}
+	
+	const filepathRoot = "."
+	const port = "8080"
+
+	apiCfg := apiConfig{
+		fileServerHits: atomic.Int32{},
+		dbQueries: database.New(db),
+	}
 
 	serveMux := http.NewServeMux()
 
@@ -21,51 +45,20 @@ func main() {
 	FileHandler = apiCfg.middleWareMetricsIncr(FileHandler)
 
 	serveMux.Handle("/app/", FileHandler)
-	serveMux.HandleFunc("GET /healthz", HealthHandler)
-	serveMux.HandleFunc("GET /metrics", apiCfg.metricsHandler)
-	serveMux.HandleFunc("POST /reset", apiCfg.resetHandler)
 
+	serveMux.HandleFunc("GET /api/healthz", HealthHandler)
+	serveMux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
+
+	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
+	serveMux.HandleFunc("POST /api/validate_chirp" , validationHandler )
+
+	
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: serveMux,
 	}
 
-	err := server.ListenAndServe()
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(server.ListenAndServe())
 
-	if err != nil {
-		fmt.Println(fmt.Errorf("Error Serving requests, %v", err))
-	}
-
-}
-
-func HealthHandler(writer http.ResponseWriter, req *http.Request) {
-
-	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	writer.WriteHeader(200)
-	writer.Write([]byte("OK"))
-
-}
-
-type apiConfig struct {
-	fileServerHits atomic.Int32
-}
-
-func (cfg *apiConfig) middleWareMetricsIncr(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileServerHits.Add(1)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (cfg *apiConfig) metricsHandler(writer http.ResponseWriter, req *http.Request) {
-
-	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	result := fmt.Sprintf("Hits: %v", cfg.fileServerHits.Load())
-	writer.WriteHeader(200)
-	writer.Write([]byte(result))
-}
-
-func (cfg *apiConfig) resetHandler(writer http.ResponseWriter, req *http.Request) {
-	cfg.fileServerHits.Swap(0)
-	writer.WriteHeader(200)
 }
