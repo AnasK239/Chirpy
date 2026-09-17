@@ -19,13 +19,15 @@ import (
 type apiConfig struct {
 	fileServerHits atomic.Int32
 	dbQueries *database.Queries
+	platform string
 }
 
 func main() {
 	godotenv.Load()
 
 	dbURL := os.Getenv("DB_URL")
-
+	platform := os.Getenv("PLATFORM") 
+	
 	db , err := sql.Open("postgres" , dbURL)
 	if err != nil{
 		log.Fatalf("Error opening database conneciton")
@@ -37,6 +39,7 @@ func main() {
 	apiCfg := apiConfig{
 		fileServerHits: atomic.Int32{},
 		dbQueries: database.New(db),
+		platform: platform,
 	}
 
 	serveMux := http.NewServeMux()
@@ -52,6 +55,7 @@ func main() {
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 	serveMux.HandleFunc("POST /api/validate_chirp" , validationHandler )
 
+	serveMux.HandleFunc("POST /api/users" , apiCfg.handlerCreateUser)
 	
 	server := &http.Server{
 		Addr:    ":8080",
