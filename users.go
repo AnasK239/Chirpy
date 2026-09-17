@@ -46,14 +46,5 @@ func (cfg *apiConfig) handlerCreateUser(writer http.ResponseWriter , req *http.R
 		Email: dbUser.Email,
 	}
 
-	jsonData , err := json.Marshal(userResponse)
-	if err != nil {
-		log.Printf("Error marshalling JSON: %v", err)
-		writer.WriteHeader(500)
-		return
-	}
-
-	writer.Header().Set("Content-Type" , "application/json")
-	writer.WriteHeader(201)
-	writer.Write(jsonData)
+	respondWithJSON(writer , http.StatusCreated , userResponse)
 }
