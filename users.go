@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/AnasK239/Chirpy/internal/auth"
+	"github.com/AnasK239/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -18,9 +20,11 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
+
 func (cfg *apiConfig) handlerCreateUser(writer http.ResponseWriter , req *http.Request){
 	type request struct{
-		Email string `json:"email"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 	
 	var reqStruct request
@@ -31,8 +35,20 @@ func (cfg *apiConfig) handlerCreateUser(writer http.ResponseWriter , req *http.R
 		writer.WriteHeader(500)
 		return
 	}
+
+	hashedPassword , err := auth.HashPassword(reqStruct.Password)
+	if err != nil {
+		log.Printf("Error hashing password: %v" , err)
+		writer.WriteHeader(500)
+		return 
+	}
 	
-	dbUser , err := cfg.dbQueries.CreateUser(req.Context() , reqStruct.Email)
+	values := database.CreateUserParams{
+		Email: reqStruct.Email,
+		HashedPassword: hashedPassword,
+	}
+	
+	dbUser , err := cfg.dbQueries.CreateUser(req.Context() , values)
 	if err != nil {
 		log.Printf("Error creating user")
 		writer.WriteHeader(500)

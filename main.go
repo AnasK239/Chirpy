@@ -12,10 +12,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// http.FileServer(http.Dir(".")) is a handler that serves files from the exact URL resource path given
-// http.NewServeMux creates an Interception point for requests
-// calling .Handle on a serveMux requires giving the request path to be handled
-// and the handler that handles it
 type apiConfig struct {
 	fileServerHits atomic.Int32
 	dbQueries *database.Queries
@@ -44,6 +40,11 @@ func main() {
 
 	serveMux := http.NewServeMux()
 
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: serveMux,
+	}
+
 	FileHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 	FileHandler = apiCfg.middleWareMetricsIncr(FileHandler)
 
@@ -59,11 +60,9 @@ func main() {
 	
 	serveMux.HandleFunc("GET /api/chirps" , apiCfg.handleGetAllChirps)
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}" , apiCfg.handleGetChirp)
-	
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: serveMux,
-	}
+
+	serveMux.HandleFunc("POST /api/login" , apiCfg.handleLogin)
+
 
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(server.ListenAndServe())
