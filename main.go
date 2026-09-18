@@ -13,9 +13,10 @@ import (
 )
 
 type apiConfig struct {
-	fileServerHits atomic.Int32
-	dbQueries *database.Queries
-	platform string
+	fileServerHits 	atomic.Int32
+	dbQueries 		*database.Queries
+	platform 		string
+	jwtSecret 		string
 }
 
 func main() {
@@ -23,6 +24,7 @@ func main() {
 
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM") 
+	jwtSecret := os.Getenv("JWT_SECRET")
 	
 	db , err := sql.Open("postgres" , dbURL)
 	if err != nil{
@@ -36,6 +38,7 @@ func main() {
 		fileServerHits: atomic.Int32{},
 		dbQueries: database.New(db),
 		platform: platform,
+		jwtSecret: jwtSecret,
 	}
 
 	serveMux := http.NewServeMux()
@@ -62,7 +65,9 @@ func main() {
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}" , apiCfg.handleGetChirp)
 
 	serveMux.HandleFunc("POST /api/login" , apiCfg.handleLogin)
+	serveMux.HandleFunc("POST /api/refresh", apiCfg.HandleRefreshAccessToken)
 
+	serveMux.HandleFunc("POST /api/revoke", apiCfg.HandleRevokeRefreshToken)
 
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(server.ListenAndServe())
