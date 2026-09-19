@@ -64,3 +64,62 @@ func (cfg *apiConfig) handlerCreateUser(writer http.ResponseWriter , req *http.R
 
 	respondWithJSON(writer , http.StatusCreated , userResponse)
 }
+
+
+func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter , r *http.Request){
+	type request struct {
+		NewPassword  string `json:"password"`
+		NewEmail 	 string	`json:"email"`
+	}
+
+	var reqStruct request
+
+	err := json.NewDecoder(r.Body).Decode(&reqStruct)
+	if err != nil {
+		log.Printf("Error Unmarshalling JSON: %v", err)
+		w.WriteHeader(500)
+		return
+	}
+	defer r.Body.Close()
+
+	authToken , err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w , 401 , err.Error())
+		return
+	}
+	
+	userID , err := auth.ValidateJWT(authToken , cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w , 401 , "Invalid token")
+		return
+	}
+
+	newHashedPass , err:= auth.HashPassword(reqStruct.NewPassword)
+	if err != nil {
+		log.Print("Couldn't hash password")
+		w.WriteHeader(500)
+		return
+	}
+
+	values := database.UpdatePasswordAndEmailParams{
+		HashedPassword: newHashedPass,
+		Email: reqStruct.NewEmail,
+		ID: userID,
+	}
+
+	updatedDBUser , err := cfg.dbQueries.UpdatePasswordAndEmail(r.Context() , values)
+	if err != nil {
+		respondWithError(w , 500 , "Couldn't update user detail")
+	}
+
+	userResponse := User{
+		ID: updatedDBUser.ID,
+		CreatedAt: updatedDBUser.CreatedAt,
+		UpdatedAt: updatedDBUser.UpdatedAt,
+		Email: updatedDBUser.Email,
+	}
+
+	respondWithJSON(w , 200 , userResponse)
+}
+
+

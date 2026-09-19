@@ -54,21 +54,23 @@ func main() {
 	serveMux.Handle("/app/", FileHandler)
 
 	serveMux.HandleFunc("GET /api/healthz", HealthHandler)
+	
 	serveMux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
-
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 
 	serveMux.HandleFunc("POST /api/users" , apiCfg.handlerCreateUser)
+	serveMux.HandleFunc("PUT /api/users" , apiCfg.handleUpdateUser)
+
 	serveMux.HandleFunc("POST /api/chirps" , apiCfg.handleCreateChirp)
-	
 	serveMux.HandleFunc("GET /api/chirps" , apiCfg.handleGetAllChirps)
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}" , apiCfg.handleGetChirp)
-
+	serveMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handleDeleteChirp)
+	
 	serveMux.HandleFunc("POST /api/login" , apiCfg.handleLogin)
 	serveMux.HandleFunc("POST /api/refresh", apiCfg.HandleRefreshAccessToken)
-
 	serveMux.HandleFunc("POST /api/revoke", apiCfg.HandleRevokeRefreshToken)
-
+	
+	
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(server.ListenAndServe())
 

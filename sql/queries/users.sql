@@ -18,3 +18,17 @@ WHERE u.email = $1;
 
 -- name: DeleteAllUsers :exec
 DELETE FROM users;
+
+-- name: FindUserById :one
+SELECT
+    *
+FROM users AS u
+WHERE u.id = $1;
+
+-- name: UpdatePasswordAndEmail :one
+UPDATE users
+SET email = $1,
+    hashed_password = $2,
+    updated_at = NOW()
+WHERE users.id = $3
+RETURNING *;

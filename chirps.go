@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -41,15 +42,9 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter , r *http.Request)
 	}
 	defer r.Body.Close()
 
-	authToken , err := auth.GetBearerToken(r.Header)
+	userID ,  err :=  cfg.checkCredentials(r.Header)
 	if err != nil {
-		respondWithError(w , 401 , err.Error())
-		return
-	}
-	
-	userID , err := auth.ValidateJWT(authToken , cfg.jwtSecret)
-	if err != nil {
-		respondWithError(w , 401 , "Invalid token")
+		respondWithError(w , http.StatusUnauthorized , err.Error())
 		return
 	}
 
@@ -112,7 +107,6 @@ func (cfg *apiConfig) handleGetAllChirps(w http.ResponseWriter , r *http.Request
 
 func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter , r *http.Request){
 
-
 	id , err := uuid.Parse(r.PathValue("chirpID"))
 	if err != nil {
 		respondWithError(w , 500 , "INVALID ID")
@@ -136,6 +130,43 @@ func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter , r *http.Request){
 	respondWithJSON(w , http.StatusOK , chirp)
 }
 
+func (cfg *apiConfig) handleDeleteChirp(w http.ResponseWriter , r *http.Request) {
+
+	userID ,  err :=  cfg.checkCredentials(r.Header)
+	if err != nil {
+		respondWithError(w , http.StatusUnauthorized , err.Error())
+		return
+	}
+	
+	chirpId , err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(w , 500 , "INVALID ID")
+		return
+	}
+	
+	chirp , err := cfg.dbQueries.GetChirp(r.Context() , chirpId)
+	if err != nil {
+		respondWithError(w , http.StatusNotFound , "Chirp doesn't exist")
+		return
+	}
+
+	if chirp.UserID != userID {
+		respondWithError(w , http.StatusForbidden , "You don't own this resource")
+		return
+	}
+
+	err = cfg.dbQueries.DeleteChirp(r.Context() , chirp.ID)
+	if err != nil {
+		respondWithError(w , 500 , "Couldn't delete chirp")
+		return
+	}
+
+	w.WriteHeader(204)
+}
+
+
+
+
 func validateAndCleanChirp(requestData string) (string , bool) {
 	
 	if len(requestData) > 140 {
@@ -147,6 +178,7 @@ func validateAndCleanChirp(requestData string) (string , bool) {
 	return cleanedBody , true
 
 }
+
 
 
 func cleanProfanity(message string , words map[string]struct{}) string {
@@ -161,4 +193,19 @@ func cleanProfanity(message string , words map[string]struct{}) string {
 	}
 
 	return strings.Join(slice , " ")
+}
+
+func (cfg *apiConfig) checkCredentials(headers http.Header) (uuid.UUID, error) {
+
+	authToken , err := auth.GetBearerToken(headers)
+	if err != nil {
+		return  uuid.UUID{},  err
+	}
+	
+	userID , err := auth.ValidateJWT(authToken , cfg.jwtSecret)
+	if err != nil {
+		return  uuid.UUID{}, errors.New("Invalid token")
+	}
+
+	return userID,  nil
 }
