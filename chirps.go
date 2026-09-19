@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -80,18 +81,48 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter , r *http.Request)
 
 
 
+
 func (cfg *apiConfig) handleGetAllChirps(w http.ResponseWriter , r *http.Request){
 
-	dbChrips , err := cfg.dbQueries.GetChirpsOrderByCreatedAtAsc(r.Context())
+	authorIDParam := r.URL.Query().Get("author_id")
+	sortParam := r.URL.Query().Get("sort") 
+
+
+	dbChirps := []database.Chirp{}
+	var err error
+
+	if authorIDParam != "" {
+		
+		id , err := uuid.Parse(authorIDParam)
+		if err != nil {
+			respondWithError(w , http.StatusBadRequest , "Malformed ID")
+			return
+		}
+		
+		dbChirps , err = cfg.dbQueries.GetAuthorChirps(r.Context() , id)
+	} else {
+		dbChirps , err = cfg.dbQueries.GetAllChirps(r.Context())
+	}
+	
 	if err != nil {
-		log.Printf("Error Unmarshalling JSON: %v", err)
+		log.Printf("Error while fetching chirps: %v", err)
 		w.WriteHeader(500)
 		return
+	}	
+
+	if sortParam == "desc" {
+		sort.Slice(dbChirps , func(i, j int) bool {
+			return dbChirps[j].CreatedAt.Before(dbChirps[i].CreatedAt)  
+		})
+	}else {
+		sort.Slice(dbChirps , func(i, j int) bool {
+			return dbChirps[i].CreatedAt.Before(dbChirps[j].CreatedAt)  
+		})
 	}
+	
+	responseChirps := make([]Chirp , 0 , len(dbChirps))
 
-	responseChirps := make([]Chirp , 0 , len(dbChrips))
-
-	for _ , dbChirp := range dbChrips {
+	for _ , dbChirp := range dbChirps {
 		responseChirps = append(responseChirps , Chirp{
 			ID: dbChirp.ID,
 			CreatedAt: dbChirp.CreatedAt,
