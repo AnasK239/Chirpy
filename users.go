@@ -14,10 +14,11 @@ import (
 
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID        	uuid.UUID `json:"id"`
+	CreatedAt 	time.Time `json:"created_at"`
+	UpdatedAt 	time.Time `json:"updated_at"`
+	Email     	string    `json:"email"`
+	IsChirpyRed bool	  `json:"is_chirpy_red"`
 }
 
 
@@ -50,7 +51,7 @@ func (cfg *apiConfig) handlerCreateUser(writer http.ResponseWriter , req *http.R
 	
 	dbUser , err := cfg.dbQueries.CreateUser(req.Context() , values)
 	if err != nil {
-		log.Printf("Error creating user")
+		log.Printf("Error creating user %v" , err)
 		writer.WriteHeader(500)
 		return
 	}
@@ -60,6 +61,7 @@ func (cfg *apiConfig) handlerCreateUser(writer http.ResponseWriter , req *http.R
 		CreatedAt: dbUser.CreatedAt,
 		UpdatedAt: dbUser.UpdatedAt,
 		Email: dbUser.Email,
+		IsChirpyRed: dbUser.IsChirpyRed,
 	}
 
 	respondWithJSON(writer , http.StatusCreated , userResponse)
@@ -117,6 +119,7 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter , r *http.Request){
 		CreatedAt: updatedDBUser.CreatedAt,
 		UpdatedAt: updatedDBUser.UpdatedAt,
 		Email: updatedDBUser.Email,
+		IsChirpyRed: updatedDBUser.IsChirpyRed,
 	}
 
 	respondWithJSON(w , 200 , userResponse)

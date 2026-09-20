@@ -17,6 +17,7 @@ type apiConfig struct {
 	dbQueries 		*database.Queries
 	platform 		string
 	jwtSecret 		string
+	polkaKey		string
 }
 
 func main() {
@@ -25,6 +26,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM") 
 	jwtSecret := os.Getenv("JWT_SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 	
 	db , err := sql.Open("postgres" , dbURL)
 	if err != nil{
@@ -39,6 +41,7 @@ func main() {
 		dbQueries: database.New(db),
 		platform: platform,
 		jwtSecret: jwtSecret,
+		polkaKey: polkaKey,
 	}
 
 	serveMux := http.NewServeMux()
@@ -53,6 +56,8 @@ func main() {
 
 	serveMux.Handle("/app/", FileHandler)
 
+	serveMux.HandleFunc("POST /api/polka/webhooks" , apiCfg.handleUpgradeEvent)
+	
 	serveMux.HandleFunc("GET /api/healthz", HealthHandler)
 	
 	serveMux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
